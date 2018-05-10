@@ -1,0 +1,7 @@
+CSE 361s Spring 2018
+Exercise 1
+Grading sheet
+
+Grade:   10/10
+Comments: TheOnion.txt was modified, but deformed. Most commands were tried in bash_history.txt
+Grader initials: MS

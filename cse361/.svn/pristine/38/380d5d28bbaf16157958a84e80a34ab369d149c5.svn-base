@@ -1,0 +1,20 @@
+CSE 361s Spring 2018
+Exercise 3
+Grading Sheet
+
+Note: this sheet will only be filled in if you did not receive a perfect 10/10
+score.
+
+Your list was tested with a standard set of inputs designed to exercise its
+full functionality, with the list being printed at checkpoints along the way.
+Credit for specific functionality is listed below:
+
+Prepend/append:  / 4
+Delete:          / 3
+Size:            / 1
+Clean Valgrind:  / 2
+
+Total:           / 10
+
+Notes:
+Grader initials: 

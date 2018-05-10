@@ -1,0 +1,270 @@
+man mv
+man ls
+exit
+ls
+cat ~/.bash_history
+cat ~/.bash_historyls
+ls
+man cat
+cat ~/.bash_historyls
+cat ~/.bash_history
+vi ~/.bash_history
+exit
+vi ~/.bash_history
+cat ~/.bash_history
+pwd
+cd
+pwd
+cd /home
+ls
+cat ~/.bash_history
+pwd
+ls
+cd warehouse/
+ls
+cd wushuo/
+ls
+cd
+ls
+cd home
+cd /home
+ls
+mkdir temp
+sudo mkdir temp
+exit
+cd ~/.bash_history
+wc ~/.bash_history
+man wc
+man less
+man ack
+man cat
+cat ~/.bash_history
+ls
+pwd
+bash
+vi ~/.bash_history
+vi ~/.bash_historys
+vi ~/.bash_history
+bash
+pwd
+ls
+mkdir temp
+ls
+cd temp/
+ls
+vi README
+ls
+cat README 
+cd ..
+ls
+copy man
+man copy
+cp -a temp temp2
+ls
+cd temp2
+ls
+cat README 
+CD ..
+cd ..
+ls
+vi ~/.bash_history
+exit
+vi ~/.bash_history
+man rm
+rm -r temp2
+ls
+rm -r temp
+ls
+cd Downloads/
+ls
+cd~
+cd bash
+cd documents
+ls
+cd~
+cd
+ls
+svn co https://svn.seas.wustl.edu/repositories/wushuo/cse361s_sp18 cse361
+pwd
+ls
+cd cse361/
+ls
+svn help add
+svn commit
+svn help commit
+svn help add
+svn help commit
+svn help status
+svn status
+svn help status
+svn status -u
+svn log
+svn help log
+pwd
+ls
+cd exe1/
+ls
+vi test.txt
+ls
+cat test.txt 
+man touch
+pwd
+ls
+touch new.txt
+ls
+cat new.txt 
+ls
+rm new.txt 
+ls
+pwd
+svn up
+svn add
+svn add ..
+add --
+svn help add
+svn  add all
+add --all
+svn add --all
+svn add all
+svn add all--
+pwd
+ls
+svn add --force .
+svn commit-m"test"
+svn commit -m"test"
+svn help add
+svn add .
+svn help
+pwd
+exit
+pwd
+ls
+bash
+home>bash
+bash
+vi ~/.bash_history
+bash
+vi ~/.bash_history
+bash
+pwd
+ls
+bash
+ls
+pwd
+cd cse361/
+ls
+vi x
+more x
+vi x
+more x
+vi more
+vi x
+ls
+cd cse361/
+ls
+vi x
+cd ..
+ls
+cd cse361/
+ls
+cd exe1/
+ls
+vi TheOnion.txt 
+ls
+cd cse361/
+ls
+cd exe1/
+ls
+vi TheOnion.txt 
+vi TheOnion.txt ls
+ls
+cd code/
+ls
+make
+ls
+cd cse361/
+ls
+cd exe1/
+ls
+cd code/
+ls
+less Makefile 
+vi Makefile 
+man make -n
+make -n
+make -3
+make -n
+./sort
+./sort abc
+ls
+vi Makefile 
+ls
+vi sort
+sort
+ls
+cd cse361/
+ls
+cd exe1/
+ls
+cd code/
+ls
+make -n sort
+man sort
+sort 
+cs cse361/
+ls
+cd cse361/
+ls
+cs exe1/
+cd exe1/
+ls
+cdd code/
+cd code/
+ls
+man -n
+man make -n
+ls
+man sort.c -n
+man sort -n
+man sort -strtol
+man strtol
+man errno
+man perror
+man -S3 errno
+man fprintf
+man printf
+exit
+ls
+cd bash
+ls
+vi ~/.bash_history
+ls
+cd cse361/
+ls
+cd exe1/
+cd code/
+./sort 
+./sort abc
+./sort 1234567890123456789012345
+./sort 10
+exit
+vi ~/.bash_history
+gdb sort
+vi ~/.bash_history
+ls
+cd cse361/
+ls
+cd exe1/
+ls
+cd code/
+ls
+gdb sort
+man errno
+man strtol
+man perror
+man -s3 errno
+man printf
+man fprintf
+exit
+vi ~/.bash_history
+exit

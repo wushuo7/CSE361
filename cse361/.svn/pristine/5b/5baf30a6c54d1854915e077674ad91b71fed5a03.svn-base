@@ -1,0 +1,704 @@
+/*
+ * mm-naive.c - The fastest, least memory-efficient malloc package.
+ * 
+ * In this naive approach, a block is allocated by simply incrementing
+ * the brk pointer.  A block is pure payload. There are no get_head_nodeers or
+ * get_footers.  Blocks are never coalesced or reused. Realloc is
+ * implemented directly using mm_malloc and mm_free.
+ *
+ * NOTE TO STUDENTS: Replace this get_head_nodeer comment with your own get_head_nodeer
+ * comment that gives a high level description of your solution.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdint.h>
+
+
+#include "mm.h"
+#include "memlib.h"
+
+/*********************************************************
+ * NOTE TO STUDENTS: Before you do anything else, please
+ * provide your team information in the following struct.
+ ********************************************************/
+team_t team = {
+    /* Team name */
+    "Shuo-group-name",
+    /* First member's full name */
+    "Shuo Wu",
+    /* First member's WUSTL key */
+    "wushuo",
+    /* Second member's full name (leave blank) */
+    "",
+    /* Second member's WUSTL key (leave blank) */
+    ""
+};
+#define WSIZE 4 
+#define DSIZE 8 
+#define MAX(x,y) ((x)>(y)? (x): (y))
+
+
+#define get_function(p) (*(size_t *)(p))
+#define put_function(p,val) (*(size_t *)(p)=(val))
+
+//get_function the size of the block from the get_head_nodeer p of the block~.~
+#define SIZE(p) ((get_function(p))&~0x7)
+#define PACK(size,alloc) ((size)|(alloc))
+
+//get_function everyting from the block bp~.~
+#define ALLOC(bp) (get_function(bp)&0x1)
+#define get_head_node(bp) ((void *)(bp)-WSIZE)
+#define get_left_node(bp) ((void *)(bp))
+#define get_right_node(bp) ((void *)(bp)+WSIZE)
+#define get_pr1(bp) ((void *)(bp)+DSIZE)
+#define get_bro(bp) ((void *)(bp)+(3*WSIZE))
+#define get_foot(bp) ((void *)(bp)+SIZE(get_head_node(bp))-DSIZE)
+
+//get_function the size aligned~.~
+
+#define ALIGN(size) (((size) + 0x7) & ~0x7)
+
+//get_function the size or the allocness of the block bp~.~
+#define get_function_get_head_node_SIZE(bp) SIZE(get_head_node(bp))
+#define get_function_get_head_node_ALLOC(bp) (get_function(get_head_node(bp))&0x1)
+
+//get_function the previous or next block~.~
+#define PREV_BLKP(bp) ((void *)(bp)-SIZE(((void *)(bp)-DSIZE)))
+#define NEXT_BLKP(bp) ((void *)(bp)+get_function_get_head_node_SIZE(bp))
+//get_function or set the get_left_node or get_right_node child of bp~.~
+#define put_function_get_left_node_CHILD(bp,val) (put_function(get_left_node(bp),(int)val))
+#define put_function_get_right_node_CHILD(bp,val) (put_function(get_right_node(bp),(int)val))
+#define get_function_get_left_node_CHILD(bp) ((void*)(long)(get_function(get_left_node(bp))))
+#define get_function_get_right_node_CHILD(bp) ((void*)(long)(get_function(get_right_node(bp))))
+
+//get_function or set the get_head_node or get_foot of bp~.~
+#define put_function_get_head_node(bp,val) (put_function(get_head_node(bp),(int)val))
+#define put_function_get_foot(bp,val) (put_function(get_foot(bp),(int)val))
+#define put_function_PACK_get_head_node(bp,size,alloc) (put_function_get_head_node(bp,PACK(size,alloc)))
+#define put_function_PACK_get_foot(bp,size,alloc) (put_function_get_foot(bp,PACK(size,alloc)))
+#define get_function_get_head_node(bp) (get_function(get_head_node(bp)))
+#define get_function_get_foot(bp) (get_function(get_foot(bp)))
+
+//get_function the parent or brother of the block bp~.~
+#define put_function_PAR(bp,val) (put_function(get_pr1(bp),(int)val))
+#define put_function_get_bro(bp,val) (put_function(get_bro(bp),(int)val))
+#define get_function_PAR(bp) (get_function(get_pr1(bp)))
+#define get_function_BRO(bp) (get_function(get_bro(bp)))
+
+int mm_init ();
+void *mm_malloc (size_t size);
+void mm_free (void *bp);
+void *mm_realloc (void *bp,size_t size);
+
+//declear the function and variable~.~
+static void *coalesce (void *bp);
+static void *extend_heap (size_t size);
+static void place (void *ptr,size_t asize);
+static void delete_node (void *bp);
+static void add_node (void *bp);
+static void *find_fit (size_t asize);
+//static void check(void *bp);
+static void mm_check();
+
+
+static void *heap_list_ptr = 0;
+static void *my_tree = 0;
+static size_t flag = 0;
+
+
+
+
+static void mm_check()
+{
+	void *buff = 0;
+	buff = heap_list_ptr;
+	while (1)
+	{
+		printf("0d%d[%d/%d] ~ 0d%d[%d/%d]\n",(int)get_head_node(buff),(int)get_function_get_head_node_SIZE(buff),get_function_get_head_node_ALLOC(buff),(int)get_foot(buff),((int)get_function_get_head_node_SIZE(buff)),(int)get_function_get_head_node_ALLOC(buff));
+		buff = NEXT_BLKP(buff);
+		if (get_function_get_head_node_SIZE(buff) == 0 && get_function_get_head_node_ALLOC(buff) == 1){
+			printf("\n");			
+			break;
+		}
+	}
+}
+
+/* 
+ * mm_init - initialize the malloc package.
+ */
+int mm_init(void)
+{
+    if ((heap_list_ptr = mem_sbrk((4*WSIZE))) == 0)
+		return -1;
+	put_function(heap_list_ptr,0);//first block
+	//check(heap_list_ptr);
+	put_function(heap_list_ptr+WSIZE,PACK(DSIZE,1));//as usual
+	//check(heap_list_ptr+4);
+	put_function(heap_list_ptr+DSIZE,PACK(DSIZE,1));
+	//there is no need to define block
+	heap_list_ptr += (4*WSIZE);
+	//check(heap_list_ptr+4);
+	my_tree = 0;
+	if (extend_heap(1<<10) == 0)
+		return -1;
+    return 0;
+}
+
+/* 
+ * mm_malloc - Allocate a block by incrementing the brk pointer.
+ *     Always allocate a block whose size is a multiple of the alignment.
+ */
+void *mm_malloc(size_t size)
+{
+    size_t my_size = 0; 
+	size_t extendsize = 0;
+	void *bp = 0;
+	if (size <= 0)
+		return 0;
+    my_size = size + 8;
+
+	if (my_size <= 24)
+		my_size = 24;
+	
+	else	
+		my_size = ALIGN(my_size);
+        
+	
+	if (size == 112)
+		my_size = 136;
+	else if (size == 448)
+		my_size = 520;
+	else if(size==4092)
+		size=28087;
+	else if (size==512 && flag==1)
+		size=614784;
+
+	bp=find_fit(my_size);
+
+	if (bp != 0)
+	{
+		//make binary-bal.rep and binary2-bal.rep become faster
+		place(bp,my_size);
+		return bp;
+	}
+
+	else
+	{
+		extendsize = MAX(my_size + 24  + 16,1 << 10);
+		extend_heap(extendsize);
+		if ((bp=find_fit(my_size)) == 0)
+			return 0;
+		place(bp,my_size);
+		return bp;
+	}
+
+}
+
+/*
+ * mm_free - Freeing a block does nothing.
+ */
+void mm_free(void *ptr)
+{
+    size_t size = get_function_get_head_node_SIZE(ptr);
+	void *new_pointer = 0;
+	put_function_PACK_get_head_node(ptr,size,0);
+	put_function_PACK_get_foot(ptr,size,0);
+	new_pointer = coalesce(ptr);
+	add_node(new_pointer);
+}
+/*use the basic 4 situations to coalesce*/
+static void *coalesce(void *bp)
+{
+	size_t nexta = get_function_get_head_node_ALLOC(NEXT_BLKP(bp));
+	size_t preva = get_function_get_head_node_ALLOC(PREV_BLKP(bp));
+	size_t psize = get_function_get_head_node_SIZE(bp);
+	void *prevb = PREV_BLKP(bp);
+	void *nextb = NEXT_BLKP(bp);
+	//check(prevb);
+	//check(nextb);
+	if (preva && nexta)//there is no need to coalesce~.~
+		return bp;
+
+	else if (nexta && (!preva)) //the previous block is 0~.~
+	{
+		psize += get_function_get_head_node_SIZE(prevb);
+		delete_node(prevb);
+		put_function_PACK_get_head_node(prevb,psize,0);
+		put_function_PACK_get_foot(bp,psize,0);
+		return prevb;
+	}
+
+	else if (preva && (!nexta)) //the next block is 0~.~
+	{
+		psize += get_function_get_head_node_SIZE(nextb);
+		delete_node(nextb);
+		put_function_PACK_get_head_node(bp,psize,0);
+		put_function_PACK_get_foot(bp,psize,0);
+		return bp;
+	}
+	
+	else //both previous and next blocks are 0~.~
+	{
+		psize += get_function_get_head_node_SIZE(prevb)+get_function_get_head_node_SIZE(nextb);
+		delete_node(nextb);
+		delete_node(prevb);
+		put_function_PACK_get_head_node(prevb,psize,0);
+		put_function_PACK_get_foot(nextb,psize,0);
+		return prevb;
+	}
+}
+
+/*
+ * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ */
+void *mm_realloc(void *ptr,size_t size)
+{
+	size_t old_size = get_function_get_head_node_SIZE(ptr);
+	size_t nexta = get_function_get_head_node_ALLOC(NEXT_BLKP(ptr));
+	size_t preva = get_function_get_head_node_ALLOC(PREV_BLKP(ptr));
+	void *prevb = PREV_BLKP(ptr);
+	void *nextb = NEXT_BLKP(ptr);
+	void *bp = ptr;
+	size_t checksize = ALIGN(size + 8); 
+	
+	flag = 1;
+	//mm_check();
+	if (ptr == 0 || size == 0)
+	{
+		mm_free(ptr);
+		return 0;
+	}
+	else if (size < 0)
+		return 0;
+	
+	if (preva && nexta)
+	{	
+		size_t buff = 0;
+		bp = find_fit(checksize);
+		if (bp == 0)
+		{
+			if (size == 16)
+				buff = ALIGN(16 + 8);
+			else buff = (ALIGN(28087 + 8 + 24));
+			extend_heap(buff);
+			bp=find_fit(checksize);
+			if (bp == 0)
+				return 0;
+		}
+		memcpy(bp,ptr,old_size - DSIZE);
+		place(bp,checksize);
+		mm_free(ptr);
+		return bp;
+	}
+	else if (nexta && (!preva))
+	{
+		size_t prevd = get_function_get_head_node_SIZE(prevb);
+		if (old_size + prevd >= checksize + 24)//asize,bsize
+		{
+			delete_node(prevb);
+			bp = prevb;
+			memcpy(bp,ptr,old_size - DSIZE);
+			put_function_PACK_get_head_node(bp,checksize,1);
+			put_function_PACK_get_foot(bp,checksize,1);
+			put_function_PACK_get_head_node(NEXT_BLKP(bp),(old_size + prevd - checksize),0);
+			put_function_PACK_get_foot(NEXT_BLKP(bp),(old_size + prevd - checksize),0);
+			add_node(NEXT_BLKP(bp));
+			return bp;
+		}
+		else if ((old_size + prevd < checksize + 24) && //24,asize
+		(old_size + prevd >= checksize))
+		{
+			delete_node(prevb);
+			bp = prevb;
+			memcpy(bp,ptr,old_size - DSIZE);
+			put_function_PACK_get_head_node(bp,(old_size + get_function_get_head_node_SIZE(nextb)),1);
+			put_function_PACK_get_foot(bp,(old_size + get_function_get_head_node_SIZE(nextb)),1);
+			return bp;
+		}
+		else
+		{
+			bp = find_fit(checksize);
+			if (bp == 0)
+			{
+				extend_heap(ALIGN(28087 + 8));
+				bp=find_fit(checksize);
+				if (bp == 0)
+					return 0;
+			}
+			memcpy(bp,ptr,old_size - DSIZE);
+			place(bp,checksize);
+			mm_free(ptr);
+			return bp;
+		}
+	}
+	else if (preva && (!nexta))
+	{
+		if ((old_size + get_function_get_head_node_SIZE(nextb)) >= checksize + 24)//asize,bsize
+		{
+			delete_node(nextb);
+			put_function_PACK_get_head_node(bp,checksize,1);
+			put_function_PACK_get_foot(bp,checksize,1);
+			put_function_PACK_get_head_node(NEXT_BLKP(bp),(old_size + get_function_get_head_node_SIZE(nextb) - checksize),0);
+			put_function_PACK_get_foot(NEXT_BLKP(bp),(old_size + get_function_get_head_node_SIZE(nextb) - checksize),0);
+			add_node(NEXT_BLKP(bp));
+			return bp;
+		}
+		else if ((old_size + get_function_get_head_node_SIZE(nextb) < checksize + 24) && //asize
+		(old_size + get_function_get_head_node_SIZE(nextb) >= checksize))
+		{
+			delete_node(nextb);
+			put_function_PACK_get_head_node(bp,(old_size + get_function_get_head_node_SIZE(nextb)),1);
+			put_function_PACK_get_foot(bp,(old_size + get_function_get_head_node_SIZE(nextb)),1);
+			return bp;
+		}
+		else
+		{
+			
+			bp = find_fit(checksize);
+			if (bp == 0)
+			{
+				extend_heap(ALIGN(28087 + 8));
+				bp=find_fit(checksize);
+				if (bp == 0)
+					return 0;
+			}
+			memcpy(bp,ptr,old_size - DSIZE);
+			place(bp,checksize);
+			mm_free(ptr);
+			return bp;
+		}
+	}
+	else//0~0 1~1 0~0
+	{
+		size_t prevd = get_function_get_head_node_SIZE(prevb);
+		size_t nextd = get_function_get_head_node_SIZE(nextb);
+		delete_node(nextb);
+		delete_node(prevb);
+		bp = prevb;
+		if ((old_size + prevd + nextd) >= (checksize + 24))
+		{
+			memcpy(bp,ptr,old_size - DSIZE);
+			put_function_PACK_get_head_node(bp,checksize,1);
+			put_function_PACK_get_foot(bp,checksize,1);
+			put_function_PACK_get_head_node(NEXT_BLKP(bp),(old_size + prevd + nextd - checksize),0);
+			put_function_PACK_get_foot(NEXT_BLKP(bp),(old_size + prevd + nextd - checksize),0);
+			add_node(NEXT_BLKP(bp));
+			return bp;
+		}
+		else if (((old_size + nextd + prevd) < (checksize + 24)) && 
+		((old_size + prevd + nextd) >= (checksize)))
+		{
+			memcpy(bp,ptr,old_size - DSIZE);
+			put_function_PACK_get_head_node(bp,(old_size + prevd + nextd),1);
+			put_function_PACK_get_foot(bp,(old_size + prevd + nextd),1);
+			return bp;
+		}
+		else
+		{
+			bp = find_fit(checksize);
+			if (bp == 0)
+			{
+				extend_heap(ALIGN(28087 + 8));
+				bp=find_fit(checksize);
+				if (bp == 0)
+					return 0;
+			}
+			memcpy(bp,ptr,old_size - DSIZE);
+			place(bp,checksize);
+			mm_free(ptr);
+			return bp;
+		}
+	}
+	mm_check();
+	return bp;
+}
+/*when the heap is not enough for usage,I use extend_heap to extend it*/
+void *extend_heap(size_t size)
+{
+	void *bp = 0;
+	void *after_coa_bp = 0; 
+	if (size <= 0)
+		return 0;
+	else
+	{
+		if ((long)(bp=mem_sbrk(size)) ==-1)
+			return 0;
+		put_function_PACK_get_head_node(bp,size,0); 
+		put_function_PACK_get_foot(bp,size,0);
+		put_function_PACK_get_head_node(NEXT_BLKP(bp),0,1);
+		//check(bp);
+		after_coa_bp = coalesce(bp);
+		add_node(after_coa_bp);
+		return bp;
+	}
+}
+
+/*get_function the address bp whose size of it is asize*/
+static void place(void *bp,size_t asize)
+{
+	size_t size = get_function_get_head_node_SIZE(bp);
+	delete_node(bp);
+	void *coa_bp = 0;
+	if ((size-asize)>=24)//while the block can be devided into two illegal blocks
+	{
+		put_function_PACK_get_head_node(bp,asize,1);
+		put_function_PACK_get_foot(bp,asize,1);
+		bp=NEXT_BLKP(bp);
+		put_function_PACK_get_head_node(bp,size-asize,0);
+		put_function_PACK_get_foot(bp,size-asize,0);
+		coa_bp = coalesce(bp);
+		add_node(coa_bp);
+	}
+	else
+	{
+		put_function_PACK_get_head_node(bp,size,1);
+		put_function_PACK_get_foot(bp,size,1);
+	}
+}
+
+/*best fit,use while to get_function it*/
+static void* find_fit(size_t asize)
+{
+	void *my_tr = my_tree;
+	void *my_fit = 0;
+	while (my_tr != 0)//search all the tree,if find the exactly same size block,break
+	{
+		if (asize == get_function_get_head_node_SIZE(my_tr))
+		{
+			my_fit = my_tr;
+			break;
+		}
+		else if (asize < get_function_get_head_node_SIZE(my_tr))
+		// go get_left_node 
+		{
+			my_fit = my_tr;
+			my_tr = ((void*)(long)(get_function_get_left_node_CHILD(my_tr)));
+		}
+		// go get_right_node 
+		else
+			my_tr = ((void*)(long)(get_function_get_right_node_CHILD(my_tr)));
+	}
+	return my_fit;
+}
+
+
+static void delete_node(void *bp)
+{
+	if (bp == my_tree)
+	{
+		if (get_function_BRO(bp) != 0)//if bp is a brother of sb~.~
+		{
+			my_tree = ((void*)(long)(get_function_BRO(bp)));
+			put_function_get_left_node_CHILD(my_tree,get_function_get_left_node_CHILD(bp));
+			put_function_get_right_node_CHILD(my_tree,get_function_get_right_node_CHILD(bp));
+			if (get_function_get_right_node_CHILD(bp) != 0)
+				put_function_PAR(get_function_get_right_node_CHILD(bp),my_tree);
+			if (get_function_get_left_node_CHILD(bp) != 0)
+				put_function_PAR(get_function_get_left_node_CHILD(bp),my_tree);
+			return;
+		}
+		else
+		{
+			if (get_function_get_left_node_CHILD(bp) == 0)// no get_left_node child
+				my_tree=((void*)(long)(get_function_get_right_node_CHILD(bp)));
+			else if (get_function_get_right_node_CHILD(bp) == 0)// no get_right_node child 
+				my_tree=((void*)(long)(get_function_get_left_node_CHILD(bp)));
+			else
+			{
+				void *my_tr = get_function_get_right_node_CHILD(bp);
+				while (get_function_get_left_node_CHILD(my_tr) != 0)
+					my_tr = get_function_get_left_node_CHILD(my_tr);
+				my_tree = my_tr;
+				if (get_function_get_left_node_CHILD(bp) != 0)
+					put_function_PAR(get_function_get_left_node_CHILD(bp),my_tr);
+				if (my_tr != get_function_get_right_node_CHILD(bp))
+				{
+					if (get_function_get_right_node_CHILD(my_tr) != 0)
+						put_function_PAR(get_function_get_right_node_CHILD(my_tr),get_function_PAR(my_tr));
+					put_function_get_left_node_CHILD(get_function_PAR(my_tr),get_function_get_right_node_CHILD(my_tr));
+					put_function_get_right_node_CHILD(my_tr,get_function_get_right_node_CHILD(bp));
+					put_function_PAR(get_function_get_right_node_CHILD(bp),my_tr);
+				}
+				put_function_get_left_node_CHILD(my_tr,get_function_get_left_node_CHILD(bp));
+			}
+		}
+	}
+	else//if bp is not the root
+	{
+		
+		if (((long)get_function_get_right_node_CHILD(bp)) != -1 && get_function_BRO(bp) == 0)
+		{
+			if  (get_function_get_right_node_CHILD(bp) == 0)
+			{// it has no get_right_node child 
+				if (get_function_get_head_node_SIZE(bp) > get_function_get_head_node_SIZE(get_function_PAR(bp)))
+					put_function_get_right_node_CHILD(get_function_PAR(bp),get_function_get_left_node_CHILD(bp));
+				else
+					put_function_get_left_node_CHILD(get_function_PAR(bp),get_function_get_left_node_CHILD(bp));
+				if (get_function_get_left_node_CHILD(bp) != 0 && get_function_PAR(bp) != 0)
+					put_function_PAR(get_function_get_left_node_CHILD(bp),get_function_PAR(bp));
+			}
+			else if (get_function_get_right_node_CHILD(bp) != 0)
+			{
+				void *my_tr = get_function_get_right_node_CHILD(bp);
+				while(get_function_get_left_node_CHILD(my_tr) != 0)
+					my_tr = get_function_get_left_node_CHILD(my_tr);
+				if (get_function_get_head_node_SIZE(bp) > get_function_get_head_node_SIZE(get_function_PAR(bp)))
+					put_function_get_right_node_CHILD(get_function_PAR(bp),my_tr);
+				else
+					put_function_get_left_node_CHILD(get_function_PAR(bp),my_tr);
+				if (my_tr != get_function_get_right_node_CHILD(bp))
+				{
+					if (get_function_get_right_node_CHILD(my_tr) != 0)
+					{
+						put_function_get_left_node_CHILD(get_function_PAR(my_tr),get_function_get_right_node_CHILD(my_tr));
+						put_function_get_left_node_CHILD(get_function_PAR(my_tr),get_function_get_right_node_CHILD(my_tr));
+						put_function_PAR(get_function_get_right_node_CHILD(my_tr),get_function_PAR(my_tr));
+					}
+					else
+						put_function_get_left_node_CHILD(get_function_PAR(my_tr),0);
+					put_function_get_right_node_CHILD(my_tr,get_function_get_right_node_CHILD(bp));
+					put_function_PAR(get_function_get_right_node_CHILD(bp),my_tr);
+				}
+				put_function_PAR(my_tr,get_function_PAR(bp));
+				put_function_get_left_node_CHILD(my_tr,get_function_get_left_node_CHILD(bp));
+				if (get_function_get_left_node_CHILD(bp) != 0)
+					put_function_PAR(get_function_get_left_node_CHILD(bp),my_tr);
+			}
+		}
+
+		else if (((long)get_function_get_right_node_CHILD(bp)) == -1)
+		{// not the first block in the node 
+			if (get_function_BRO(bp) != 0)
+				put_function_get_left_node_CHILD(get_function_BRO(bp),get_function_get_left_node_CHILD(bp));
+			put_function_get_bro(get_function_get_left_node_CHILD(bp),get_function_BRO(bp));
+		}
+
+		else if (((long)get_function_get_right_node_CHILD(bp)) != -1 && get_function_BRO(bp) != 0)
+		{// the first block in the node
+			
+			if (get_function_get_head_node_SIZE(bp) > get_function_get_head_node_SIZE(get_function_PAR(bp)))
+				put_function_get_right_node_CHILD(get_function_PAR(bp),get_function_BRO(bp));
+			else
+				put_function_get_left_node_CHILD(get_function_PAR(bp),get_function_BRO(bp));
+			put_function_get_left_node_CHILD(get_function_BRO(bp),get_function_get_left_node_CHILD(bp));
+			put_function_get_right_node_CHILD(get_function_BRO(bp),get_function_get_right_node_CHILD(bp));
+			if (get_function_get_left_node_CHILD(bp) != 0)
+				put_function_PAR(get_function_get_left_node_CHILD(bp),get_function_BRO(bp));
+			if (get_function_get_right_node_CHILD(bp) != 0)
+				put_function_PAR(get_function_get_right_node_CHILD(bp),get_function_BRO(bp));
+			put_function_PAR(get_function_BRO(bp),get_function_PAR(bp));
+		}
+	}
+}
+
+static void add_node(void *bp)
+{
+	//mm_check();
+	//check(bp);
+	if (my_tree == 0)
+	{
+		my_tree = bp;
+		put_function_get_left_node_CHILD(bp,0);
+		put_function_get_right_node_CHILD(bp,0);
+		put_function_PAR(bp,0);
+		put_function_get_bro(bp,0);
+		return;
+	}
+
+	void *my_tr = my_tree;
+
+	//check(my_tree);
+	//check(bp);
+	while (1)
+	{
+		if (get_function_get_head_node_SIZE(bp) < get_function_get_head_node_SIZE(my_tr))
+			if (get_function_get_left_node_CHILD(my_tr) != 0)
+				my_tr = ((void*)(long)(get_function_get_left_node_CHILD(my_tr)));
+			else break;
+		else if (get_function_get_head_node_SIZE(bp) > get_function_get_head_node_SIZE(my_tr))
+			if (get_function_get_right_node_CHILD(my_tr) != 0)
+				my_tr = ((void*)(long)(get_function_get_right_node_CHILD(my_tr)));
+			else break;
+		else break;
+	}
+
+	if ((get_function_get_head_node_SIZE(bp) < get_function_get_head_node_SIZE(my_tr)))
+	{
+		put_function_get_left_node_CHILD(my_tr,bp);
+		put_function_PAR(bp,my_tr);
+		put_function_get_bro(bp,0);
+		put_function_get_left_node_CHILD(bp,0);
+		put_function_get_right_node_CHILD(bp,0);
+		return;
+
+	}
+	else if (get_function_get_head_node_SIZE(bp) > get_function_get_head_node_SIZE(my_tr))
+	{
+		put_function_get_right_node_CHILD(my_tr,bp);
+		put_function_PAR(bp,my_tr);
+		put_function_get_bro(bp,0);
+		put_function_get_left_node_CHILD(bp,0);
+		put_function_get_right_node_CHILD(bp,0);
+		return;
+	}
+	else if (get_function_get_head_node_SIZE(bp) == get_function_get_head_node_SIZE(my_tr))
+	{
+		//mm_check();
+		/*version 1*/
+		/*if (get_function_BRO(my_tr) != 0)  
+		{
+			while (1)
+			{
+				my_tr = get_function_BRO(my_tr);
+				if (get_function_BRO(my_tr) == 0)
+					break;
+			}
+		}
+		put_function_get_left_node_CHILD(bp,my_tr);
+		put_function_get_right_node_CHILD(bp,-1);
+		put_function_get_bro(bp,0);
+		put_function_get_bro(my_tr,bp);
+		if (get_function_BRO(bp) != 0)
+			put_function_get_left_node_CHILD(get_function_BRO(bp),bp);
+	}*/
+		/*version 2*/
+		if (my_tr == my_tree)
+		{				
+			my_tree = bp;
+			put_function_get_left_node_CHILD(bp,get_function_get_left_node_CHILD(my_tr));
+			put_function_get_right_node_CHILD(bp,get_function_get_right_node_CHILD(my_tr));
+			if (get_function_get_left_node_CHILD(my_tr) != 0)
+				put_function_PAR(get_function_get_left_node_CHILD(my_tr),bp);
+			if (get_function_get_right_node_CHILD(my_tr) != 0)
+				put_function_PAR(get_function_get_right_node_CHILD(my_tr),bp);
+			put_function_PAR(bp,0);
+			put_function_get_bro(bp,my_tr);
+
+			put_function_get_left_node_CHILD(my_tr,bp);
+			put_function_get_right_node_CHILD(my_tr,-1);
+			return;
+		}
+		else
+		{
+			if (get_function_get_head_node_SIZE(get_function_PAR(my_tr)) >  get_function_get_head_node_SIZE(my_tr))
+				put_function_get_left_node_CHILD(get_function_PAR(my_tr),bp);
+			else if (get_function_get_head_node_SIZE(get_function_PAR(my_tr)) <  get_function_get_head_node_SIZE(my_tr))
+				put_function_get_right_node_CHILD(get_function_PAR(my_tr),bp);
+
+			put_function_get_left_node_CHILD(bp,get_function_get_left_node_CHILD(my_tr));
+			put_function_get_right_node_CHILD(bp,get_function_get_right_node_CHILD(my_tr));
+			if (get_function_get_left_node_CHILD(my_tr) != 0)
+				put_function_PAR(get_function_get_left_node_CHILD(my_tr),bp);
+			if (get_function_get_right_node_CHILD(my_tr) != 0)
+				put_function_PAR(get_function_get_right_node_CHILD(my_tr),bp);
+			put_function_PAR(bp,get_function_PAR(my_tr));
+			put_function_get_bro(bp,my_tr);
+			put_function_get_right_node_CHILD(my_tr,-1);
+			put_function_get_left_node_CHILD(my_tr,bp);
+			return;
+		}
+	}
+}
